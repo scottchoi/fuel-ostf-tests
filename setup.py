@@ -37,7 +37,7 @@ requirements = ['argparse==1.2.1',
                 'testtools==0.9.32',
                 'warlock==1.0.1',
                 'wsgiref==0.1.2',
-                'pika==0.9.14']
+                'pika==0.9.13']
 
 
 setuptools.setup(
