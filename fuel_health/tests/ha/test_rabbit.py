@@ -27,7 +27,7 @@ class RabbitSmokeTest(BaseTestCase):
     @timed(45.9)
     def test_rabbitmqctl_status(self):
         """Test verifies RabbitMQ has proper cluster structure
-         is abailable from all the controllers"""
+         is available from all the controllers"""
         def _format_output(output):
             """
             Internal function allows remove all the not valuable chars
