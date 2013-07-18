@@ -19,9 +19,10 @@ import os
 import sys
 
 from oslo.config import cfg
+import requests
 
 from fuel_health.common import log as logging
-import requests
+
 
 LOG = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ IdentityGroup = [
                help="Administrative Tenant name to use for Keystone API "
                     "requests."),
     cfg.StrOpt('admin_password',
-               default='pass',
+               default='admin',
                help="API key to use when authenticating as admin.",
                secret=True),
 ]
@@ -126,7 +127,7 @@ ComputeGroup = [
                default='compute',
                help="Catalog type of the Compute service."),
     cfg.StrOpt('path_to_private_key',
-               default=None,
+               default='/root/.ssh/id_rsa',
                help="Path to a private key file for SSH access to remote "
                     "hosts"),
     cfg.ListOpt('enabled_services',
@@ -134,10 +135,10 @@ ComputeGroup = [
                 help="If false, skip config tests regardless of the "
                      "extension status"),
     cfg.ListOpt('controller_nodes',
-                default= [],
+                default=[],
                 help="IP address of one of the controller nodes"),
     cfg.ListOpt('controller_nodes_name',
-                default= [],
+                default=[],
                 help="DNS name of one of the controller nodes"),
     cfg.StrOpt('controller_node_ssh_user',
                default='ssh_user',
@@ -146,10 +147,10 @@ ComputeGroup = [
                default='pass',
                help="ssh user pass of one of the controller nodes"),
     cfg.StrOpt('controller_node_ssh_key_path',
-               default='',
+               default='/root/.ssh/id_rsa',
                help="path to ssh key"),
     cfg.StrOpt('image_name',
-               default="cirros-0.3.0-x86_64",
+               default="cirros",
                help="Valid secondary image reference to be used in tests."),
     cfg.IntOpt('flavor_ref',
                default=1,
@@ -412,7 +413,7 @@ class NailgunConfig(object):
                         'in nailgun api' % api_url)
         elif response.status_code == 200:
             data = response.json()
-            self.identity.url = data['horizon_url']
+            self.identity.url = data['horizon_url'] + 'dashboard'
             self.identity.uri = data['keystone_url'] + 'v2.0/'
             self.identity.admin_tenant_name = data['admin_tenant_name']
             self.identity.admin_username = data['admin_username']
