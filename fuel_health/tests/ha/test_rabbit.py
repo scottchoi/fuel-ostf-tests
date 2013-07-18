@@ -36,25 +36,27 @@ class RabbitSmokeTest(BaseTestCase):
         cls._key = cls.config.compute.controller_node_ssh_key_path
         cls._ssh_timeout = cls.config.compute.ssh_timeout
         cls._queue = rand_name('ost1_test-test-queue')
-        cls._rabbit_user = cls.config.identity.admin_username
-        cls._rabbit_password = cls.config.identity.admin_password
+        cls._rabbit_user = rand_name('ost1_testrabbitmquser')
+        cls._rabbit_password = cls._rabbit_user
         cls._amqp_clients = []
+        cls._rabbit_user_exists = False
 
-    @classmethod
-    def tearDownClass(cls):
-        if cls._queue:
-            for client in cls._amqp_clients:
-                client['client'].close(cls._queue)
+    def setUp(self):
+        super(RabbitSmokeTest, self).setUp()
+        if self._rabbit_user and self._rabbit_password:
+            self._createRabbitUser(self._rabbit_user, self._rabbit_password,
+                                   self._rabbit_user_exists)
 
-    def _format_output(self, output):
-            """
-            Internal function allows remove all the not valuable chars
-            from the output
-            """
-            output = output.split('running_nodes,')[-1].split('...done.')[0]
-            for char in ' {[]}\n\r':
-                output = output.replace(char, '')
-            return output.split(',')
+    def tearDown(self):
+        try:
+            if self._queue:
+                for client in self._amqp_clients:
+                    client['client'].close(self._queue)
+        except:
+            pass
+
+        self._deleteRabbitUser(self._rabbit_user)
+        super(RabbitSmokeTest, self).tearDown()
 
     @attr(type=['fuel', 'ha', 'non-destructive'])
     @timed(60.0)
@@ -167,3 +169,41 @@ class RabbitSmokeTest(BaseTestCase):
             self.assertEqual(out_mes, message,
                              "Received message is different "
                              "from the one has been sent")
+
+
+    def _format_output(self, output):
+            """
+            Internal function allows remove all the not valuable chars
+            from the output
+            """
+            output = output.split('running_nodes,')[-1].split('...done.')[0]
+            for char in ' {[]}\n\r':
+                output = output.replace(char, '')
+            return output.split(',')
+
+    def _createRabbitUser(self, username, password, flag=False):
+        if flag:
+            return
+        cmd = 'sudo rabbitmqctl add_user %s %s; ' \
+              'sudo rabbitmqctl set_permissions %s' % \
+              (username, password, username + ' ".*" ".*" ".*"')
+        try:
+            SSHClient(host=self._controllers[0],
+                    username=self._usr,
+                    password=self._pwd,
+                    pkey=self._key,
+                    timeout=self._ssh_timeout).exec_command(cmd)
+        except SSHExecCommandFailed as exc:
+            self.fail(("Cannot create RabbitMQ user %s. The following error "
+                       "occurs: " % username) + exc._error_string)
+
+    def _deleteRabbitUser(self, username):
+        cmd = 'sudo rabbitmqctl delete_user %s' % (username)
+        try:
+            SSHClient(host=self._controllers[0],
+                    username=self._usr,
+                    password=self._pwd,
+                    pkey=self._key,
+                    timeout=self._ssh_timeout).exec_command(cmd)
+        except SSHExecCommandFailed:
+            pass
