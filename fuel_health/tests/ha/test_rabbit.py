@@ -2,7 +2,9 @@ from operator import eq
 from nose.plugins.attrib import attr
 from nose.tools import timed
 
+from fuel_health.common.amqp_client import AmqpClient, AmqpEx
 from fuel_health.common.ssh import Client as SSHClient
+from fuel_health.common.utils.data_utils import rand_name, rand_int_id
 from fuel_health.exceptions import SSHExecCommandFailed
 from fuel_health.test import BaseTestCase
 
@@ -33,6 +35,16 @@ class RabbitSmokeTest(BaseTestCase):
         cls._pwd = cls.config.compute.controller_node_ssh_password
         cls._key = cls.config.compute.controller_node_ssh_key_path
         cls._ssh_timeout = cls.config.compute.ssh_timeout
+        cls._queue = rand_name('ost1_test-test-queue')
+        cls._rabbit_user = cls.config.identity.admin_username
+        cls._rabbit_password = cls.config.identity.admin_password
+        cls._amqp_clients = []
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls._queue:
+            for client in cls._amqp_clients:
+                client['client'].close(cls._queue)
 
     def _format_output(self, output):
             """
@@ -115,3 +127,43 @@ class RabbitSmokeTest(BaseTestCase):
             self.assertEqual(len(output.symmetric_difference(temp_set)), 0,
                              "Queue lists are different for %s and %s "
                              "controllers" % (self._controllers[0], node))
+
+    def test_rabbit_ha_messages(self):
+        """Test verifies all brokers RabbitMQ receive a message
+         has been sent"""
+        message = 'ost1_test-test-message-' + str(rand_int_id(100000, 999999))
+
+        for controller in self._controllers:
+            amqp_client = None
+            try:
+                amqp_client = AmqpClient(host=controller,
+                                     rabbit_username=self._rabbit_user,
+                                     rabbit_password=self._rabbit_password)
+
+            except AmqpEx.AMQPConnectionError:
+                self.fail("Can not create AMQP Client for %s controller" %
+                      controller)
+            self._amqp_clients.append({'controller': controller, 'client': amqp_client})
+
+        try:
+            self._amqp_clients[0]['client'].create_queue(self._queue)
+        except AmqpEx.AMQPConnectionError:
+            self.fail("Cannot create queue %s on %s controller" %
+                      (self._queue, self._amqp_clients[0]['controller']))
+
+        for controller in self._amqp_clients:
+            try:
+                controller['client'].send_message(self._queue, message)
+            except AmqpEx.AMQPConnectionError:
+                self.fail("Cannot send message to %s" % controller)
+
+        for controller in self._amqp_clients:
+            try:
+                out_mes = controller['client'].receive_message(self._queue)
+                print out_mes
+            except AmqpEx.AMQPConnectionError:
+                self.fail("Cannot receive message from %s controller" % controller['controller'])
+
+            self.assertEqual(out_mes, message,
+                             "Received message is different "
+                             "from the one has been sent")
