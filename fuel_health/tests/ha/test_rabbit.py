@@ -41,22 +41,22 @@ class RabbitSmokeTest(BaseTestCase):
         cls._amqp_clients = []
         cls._rabbit_user_exists = False
 
-    def setUp(self):
-        super(RabbitSmokeTest, self).setUp()
-        if self._rabbit_user and self._rabbit_password:
-            self._createRabbitUser(self._rabbit_user, self._rabbit_password,
-                                   self._rabbit_user_exists)
+    # def setUp(self):
+    #     super(RabbitSmokeTest, self).setUp()
+    #     if self._rabbit_user and self._rabbit_password:
+    #         self._createRabbitUser(self._rabbit_user, self._rabbit_password,
+    #                               self._rabbit_user_exists)
 
-    def tearDown(self):
-        try:
-            if self._queue:
-                for client in self._amqp_clients:
-                    client['client'].close(self._queue)
-        except:
-            pass
-
-        self._deleteRabbitUser(self._rabbit_user)
-        super(RabbitSmokeTest, self).tearDown()
+    # def tearDown(self):
+    #     try:
+    #         if self._queue:
+    #             for client in self._amqp_clients:
+    #                 client['client'].close(self._queue)
+    #     except:
+    #         pass
+    #
+    #     self._deleteRabbitUser(self._rabbit_user)
+    #     super(RabbitSmokeTest, self).tearDown()
 
     @attr(type=['fuel', 'ha', 'non-destructive'])
     @timed(60.0)
@@ -133,6 +133,13 @@ class RabbitSmokeTest(BaseTestCase):
     def test_rabbit_ha_messages(self):
         """Test verifies all brokers RabbitMQ receive a message
          has been sent"""
+
+        #this action needs for the following test steps
+        #the only reason why it is not in setUp is that this one
+        #is needed just for this test and will slow others
+        self._createRabbitUser(self._rabbit_user, self._rabbit_password,
+                                   self._rabbit_user_exists)
+
         message = 'ost1_test-test-message-' + str(rand_int_id(100000, 999999))
 
         for controller in self._controllers:
@@ -166,7 +173,18 @@ class RabbitSmokeTest(BaseTestCase):
             except AmqpEx.AMQPConnectionError:
                 self.fail("Cannot receive message from %s controller" % controller['controller'])
 
-            self.assertEqual(out_mes, message,
+        try:
+            if self._queue:
+                for client in self._amqp_clients:
+                    client['client'].close(self._queue)
+        except AmqpEx.AMQPConnectionError:
+            self.fail("Cannot delete queue %s on %s controller" %
+                      (self._queue, self._amqp_clients[0]['controller']))
+
+        self._deleteRabbitUser(self._rabbit_user)
+        super(RabbitSmokeTest, self).tearDown()
+
+        self.assertEqual(out_mes, message,
                              "Received message is different "
                              "from the one has been sent")
 
