@@ -131,20 +131,13 @@ class RabbitSmokeTest(BaseTestCase):
     def test_rabbit_ha_messages(self):
         """RabbitMQ messages
         Scenario:
-          1. Create RabbitMQ user.
-          2. Create test queue on one of controllers.
+          1. Create test queue on one of controllers.
           3. Send message to the queue per controller.
           4. Check messages were received on all the controllers.
           5. Delete the queue.
-          6. Delete the RabbitMQ user.
         """
         if not self._controllers:
             self.fail('Step 1 failed: There are no controller nodes.')
-        self.verify(20, self._createRabbitUser, 1,
-                    "Cannot create RabbitMQ user %s" % self._rabbit_user,
-                    "Creating RabbitMQ user",
-                    self._rabbit_user,
-                    self._rabbit_password)
 
         message = 'ost1_test-test-message-' + str(rand_int_id(100000, 999999))
 
@@ -184,11 +177,6 @@ class RabbitSmokeTest(BaseTestCase):
                         "Closing queue",
                         self._queue)
 
-        self.verify(20, self._deleteRabbitUser, 6,
-                    "Cannot delete RabbitMQ user %s" % self._rabbit_user,
-                    "Deleting RabbitMQ user",
-                    self._rabbit_user)
-
     def _format_output(self, output):
         """
         Internal function allows remove all the not valuable chars
@@ -198,21 +186,3 @@ class RabbitSmokeTest(BaseTestCase):
         for char in ' {[]}\n\r':
             output = output.replace(char, '')
         return output.split(',')
-
-    def _createRabbitUser(self, username, password):
-        cmd = 'sudo rabbitmqctl add_user %s %s; ' \
-              'sudo rabbitmqctl set_permissions %s' % \
-              (username, password, username + ' ".*" ".*" ".*"')
-        SSHClient(host=self._controllers[0],
-                  username=self._usr,
-                  password=self._pwd,
-                  pkey=self._key,
-                  timeout=self._ssh_timeout).exec_command(cmd)
-
-    def _deleteRabbitUser(self, username):
-        cmd = 'sudo rabbitmqctl delete_user %s' % username
-        SSHClient(host=self._controllers[0],
-                  username=self._usr,
-                  password=self._pwd,
-                  pkey=self._key,
-                  timeout=self._ssh_timeout).exec_command(cmd)
